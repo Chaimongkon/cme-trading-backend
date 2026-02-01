@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, memo } from "react";
+import { useEffect, useRef, memo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Loader2 } from "lucide-react";
 
 interface TradingViewChartProps {
   symbol?: string;
@@ -27,12 +27,21 @@ function TradingViewChartComponent({
   currentPrice,
 }: TradingViewChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Reset states
+    setIsLoading(true);
+    setHasError(false);
+
     // Clear previous widget
     containerRef.current.innerHTML = "";
+
+    // Generate unique container ID to avoid conflicts
+    const containerId = `tradingview_${Date.now()}`;
 
     // Create container for the widget
     const widgetContainer = document.createElement("div");
@@ -41,6 +50,7 @@ function TradingViewChartComponent({
     widgetContainer.style.width = "100%";
 
     const widgetDiv = document.createElement("div");
+    widgetDiv.id = containerId;
     widgetDiv.className = "tradingview-widget-container__widget";
     widgetDiv.style.height = "calc(100% - 32px)";
     widgetDiv.style.width = "100%";
@@ -48,18 +58,28 @@ function TradingViewChartComponent({
     widgetContainer.appendChild(widgetDiv);
     containerRef.current.appendChild(widgetContainer);
 
-    // Create and load TradingView script
+    // Create and load TradingView script with error handling
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
+    
+    // Handle script load/error events
+    script.onload = () => {
+      setIsLoading(false);
+    };
+    script.onerror = () => {
+      setIsLoading(false);
+      setHasError(true);
+    };
+
     script.innerHTML = JSON.stringify({
       autosize: true,
       symbol: symbol,
       interval: interval,
       timezone: "Asia/Bangkok",
       theme: theme,
-      style: "1", // Candlestick
+      style: "1",
       locale: "th_TH",
       enable_publishing: false,
       hide_top_toolbar: false,
@@ -68,18 +88,26 @@ function TradingViewChartComponent({
       calendar: false,
       hide_volume: false,
       support_host: "https://www.tradingview.com",
-      container_id: "tradingview_widget",
+      container_id: containerId,
       studies: [
         "Volume@tv-basicstudies",
       ],
       show_popup_button: true,
       popup_width: "1000",
       popup_height: "650",
+      // Suppress iframe communication errors
+      allow_symbol_change: true,
     });
 
-    widgetContainer.appendChild(script);
+    // Delay script append to ensure container is ready
+    const timeoutId = setTimeout(() => {
+      if (widgetContainer.isConnected) {
+        widgetContainer.appendChild(script);
+      }
+    }, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       if (containerRef.current) {
         containerRef.current.innerHTML = "";
       }
@@ -127,11 +155,39 @@ function TradingViewChartComponent({
         )}
 
         {/* TradingView Widget Container */}
-        <div
-          ref={containerRef}
-          style={{ height: `${height}px` }}
-          className="w-full"
-        />
+        <div className="relative">
+          {/* Loading overlay */}
+          {isLoading && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"
+              style={{ height: `${height}px` }}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">กำลังโหลด TradingView...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Error state */}
+          {hasError && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center bg-background z-10"
+              style={{ height: `${height}px` }}
+            >
+              <div className="text-center text-muted-foreground">
+                <p>ไม่สามารถโหลด TradingView ได้</p>
+                <p className="text-xs mt-1">ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต</p>
+              </div>
+            </div>
+          )}
+          
+          <div
+            ref={containerRef}
+            style={{ height: `${height}px` }}
+            className="w-full"
+          />
+        </div>
 
         {/* Copyright notice */}
         <div className="px-4 py-2 text-center border-t border-border/40">
