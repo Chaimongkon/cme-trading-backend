@@ -1,0 +1,79 @@
+{
+  "manifest_version": 3,
+  "name": "CME QuikStrike Data Extractor",
+  "version": "1.3.0",
+  "description": "ดึงข้อมูล Options (Put, Call, Vol Settle, Ranges) จาก CME QuikStrike",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "alarms",
+    "scripting",
+    "sidePanel",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://*.cmegroup.com/*",
+    "https://*.quikstrike.net/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Open CME QuikStrike Panel"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.cmegroup.com/*"
+      ],
+      "js": [
+        "product-selector.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.cmegroup.com/*",
+        "https://*.quikstrike.net/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.forexfactory.com/*"
+      ],
+      "js": [
+        "forexfactory.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

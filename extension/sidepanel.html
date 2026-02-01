@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CME QuikStrike Data Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <img src="icons/icon48.png" alt="CME" width="28" height="28">
+                <h1>CME QuikStrike</h1>
+            </div>
+            <div class="status-item">
+                <label class="switch">
+                    <input type="checkbox" id="autoRefreshToggle" checked>
+                    <span class="slider"></span>
+                </label>
+                <span id="refreshInterval" class="value">5m</span>
+            </div>
+            <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+        </header>
+
+        <div class="scrollable-content">
+            <!-- Quick Open CME Links -->
+            <div class="quick-links">
+                <button id="openGoldBtn" class="quick-link-btn gold" title="เปิด Intraday Volume - Gold">
+                    🥇 Gold
+                </button>
+                <button id="openGoldOIBtn" class="quick-link-btn gold-oi" title="เปิด Open Interest - Gold">
+                    📊 OI
+                </button>
+                <button id="openGoldOIChgBtn" class="quick-link-btn gold-oichg" title="เปิด OI Change - Gold">
+                    🔄 Chg
+                </button>
+            </div>
+
+            <!-- Connection Status -->
+            <div id="connectionStatus" class="connection-status disconnected">
+                <span class="dot"></span>
+                <span class="text">กรุณาเปิดหน้า QuikStrike</span>
+            </div>
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="label">Product:</span>
+                    <span id="productName" class="value">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Type:</span>
+                    <span id="volumeType" class="value">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Update:</span>
+                    <span id="lastUpdate" class="value">-</span>
+                </div>
+            </div>
+            
+            <!-- Data Source Tabs -->
+            <div class="data-source-tabs">
+                <button class="source-tab active" data-source="volume" id="tabVolume" title="Intraday Volume - สัญญาณเทรด">
+                    📊 Vol
+                    <span class="tab-indicator" id="volIndicator">-</span>
+                    <span class="tab-hint">สัญญาณ</span>
+                </button>
+                <button class="source-tab" data-source="oi" id="tabOI" title="Open Interest - แนวรับ/แนวต้าน">
+                    📈 OI
+                    <span class="tab-indicator" id="oiIndicator">-</span>
+                    <span class="tab-hint">S/R</span>
+                </button>
+                <button class="source-tab" data-source="oichange" id="tabOIChange" title="OI Change - ยืนยันเงินไหล">
+                    🔄 OI Chg
+                    <span class="tab-indicator" id="oiChgIndicator">-</span>
+                    <span class="tab-hint">ยืนยัน</span>
+                </button>
+            </div>
+            <!-- Summary Bar - Single Row -->
+            <div class="summary-bar" id="summaryBar">
+                <div class="summary-main">
+                    <div class="future-box">
+                        <span class="future-label">Future:</span>
+                        <span id="summaryFuture" class="future-price">-</span>
+                    </div>
+                    <div class="summary-row">
+                        <div class="summary-cell put">
+                            <span class="cell-label">Put:</span>
+                            <span id="summaryPut" class="cell-value">-</span>
+                        </div>
+                        <div class="summary-cell call">
+                            <span class="cell-label">Call:</span>
+                            <span id="summaryCall" class="cell-value">-</span>
+                        </div>
+                        <div class="summary-cell vol">
+                            <span class="cell-label">Vol:</span>
+                            <span id="summaryVol" class="cell-value">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-changes">
+                    <div class="change-item">
+                        <span class="change-label">Vol Chg:</span>
+                        <span id="summaryVolChg" class="change-value">-</span>
+                    </div>
+                    <div class="change-item">
+                        <span class="change-label">Fut Chg:</span>
+                        <span id="summaryFutureChg" class="change-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Panel (Collapsible) -->
+            <div class="analysis-panel" id="analysisPanel">
+                <div class="analysis-header" id="analysisToggle">
+                    <span class="analysis-title">📊 วิเคราะห์ตลาด</span>
+                    <div class="analysis-header-right">
+                        <span id="analysisSignal" class="analysis-signal neutral">-</span>
+                        <span class="toggle-icon" id="toggleIcon">▼</span>
+                    </div>
+                </div>
+                <div class="analysis-content" id="analysisContent">
+                    <div class="analysis-body">
+                        <div class="analysis-indicator">
+                            <span class="indicator-label">สัญญาณ:</span>
+                            <span id="signalType" class="indicator-value signal-neutral">รอข้อมูล</span>
+                        </div>
+                        <div class="analysis-indicator">
+                            <span class="indicator-label">P/C Ratio:</span>
+                            <span id="pcrValue" class="indicator-value">-</span>
+                        </div>
+                        <div class="analysis-indicator">
+                            <span class="indicator-label">ความแรง:</span>
+                            <div class="strength-bar">
+                                <div id="strengthFill" class="strength-fill" style="width: 0%"></div>
+                            </div>
+                            <span id="strengthPercent" class="strength-percent">0%</span>
+                        </div>
+                    </div>
+                    <div class="analysis-details" id="analysisDetails">
+                        <p class="detail-text">กด Refresh เพื่อดึงข้อมูลและวิเคราะห์</p>
+                    </div>
+                    
+                    <!-- Trade Recommendation -->
+                    <div class="trade-recommendation" id="tradeRecommendation">
+                        <div class="trade-action" id="tradeAction">
+                            <span class="trade-icon">⏳</span>
+                            <span class="trade-text">รอข้อมูล</span>
+                        </div>
+                        <div class="trade-details" id="tradeDetails">
+                            <span>Refresh <b>Volume</b> (สัญญาณเทรด) + <b>OI</b> (แนวรับ/ต้าน)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Strike</th>
+                            <th>Put</th>
+                            <th>Call</th>
+                            <th>Settle</th>
+                            <th>Range</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="5" class="no-data">ไม่มีข้อมูล - กดปุ่ม Refresh</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Bottom Action Bar (Fixed) -->
+        <div class="bottom-action-bar">
+            <button id="refreshBtn" class="action-btn primary" title="Refresh">
+                🔄
+            </button>
+            <button id="refreshAllBtn" class="action-btn accent" title="All">
+                ⚡ All
+            </button>
+            <div class="action-divider"></div>
+            <button id="exportCsvBtn" class="action-btn ghost" title="Export CSV">
+                CSV
+            </button>
+            <button id="exportJsonBtn" class="action-btn ghost" title="Export JSON">
+                JSON
+            </button>
+            <button id="syncBackendBtn" class="action-btn warning" title="Sync">
+                ☁️
+            </button>
+            <button id="helpBtn" class="action-btn ghost-icon" title="Help">
+                ?
+            </button>
+        </div>
+
+        <!-- Settings Panel (hidden by default) -->
+        <div id="settingsPanel" class="settings-panel hidden">
+            <h3>⚙️ Settings</h3>
+            <div class="form-group">
+                <label for="backendUrl">Backend URL:</label>
+                <input type="url" id="backendUrl" placeholder="https://your-api.com/cme-data">
+            </div>
+            <div class="form-group">
+                <label for="refreshIntervalInput">Refresh Interval (minutes):</label>
+                <input type="number" id="refreshIntervalInput" min="1" max="60" value="5">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="autoSyncToggle">
+                    Auto-sync to backend
+                </label>
+            </div>
+            <button id="saveSettingsBtn" class="btn btn-primary">💾 Save Settings</button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>CME QuikStrike v4.2</span>
+            <span id="footerDatetime" class="datetime"></span>
+        </footer>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-content">
+            <div id="modalIcon" class="modal-icon">🎉</div>
+            <div id="modalTitle" class="modal-title">สำเร็จ!</div>
+            <div id="modalBody" class="modal-body">
+                <ul id="modalStatusList" class="modal-status-list"></ul>
+            </div>
+            <div id="modalMessage" class="modal-message"></div>
+            <button id="modalCloseBtn" class="modal-btn modal-btn-primary">ตกลง</button>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="sidepanel.js"></script>
+</body>
+
+</html>

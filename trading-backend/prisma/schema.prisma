@@ -1,0 +1,329 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Intraday Volume - ข้อมูล Volume ระหว่างวัน (เยอะสุด)
+// ============================================
+model IntradayVolumeSnapshot {
+  id          String   @id @default(cuid())
+  product     String   // e.g., "Gold (OG|GC)"
+  expiry      String   // e.g., "Feb 2026"
+  futurePrice Float?
+  
+  // Summary data from subtitle
+  totalPut    Float?
+  totalCall   Float?
+  vol         Float?    // Volatility
+  volChg      Float?    // Vol Change
+  futureChg   Float?    // Future price change
+  
+  extractedAt DateTime
+  createdAt   DateTime @default(now())
+
+  strikes IntradayVolumeStrike[]
+
+  @@index([product, extractedAt])
+  @@index([createdAt])
+  @@index([product, createdAt])
+}
+
+model IntradayVolumeStrike {
+  id         String                  @id @default(cuid())
+  snapshotId String
+  snapshot   IntradayVolumeSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  strike    Float
+  putVol    Float?    // Put Volume
+  callVol   Float?    // Call Volume
+  volSettle Float?    // Implied Volatility %
+  range     String?   // Expected Range
+
+  @@index([snapshotId, strike])
+}
+
+// ============================================
+// Open Interest - OI สะสม
+// ============================================
+model OiSnapshot {
+  id          String   @id @default(cuid())
+  product     String
+  expiry      String
+  futurePrice Float?
+  
+  // Summary data
+  totalPutOi  Float?
+  totalCallOi Float?
+  vol         Float?
+  volChg      Float?
+  futureChg   Float?
+  
+  extractedAt DateTime
+  createdAt   DateTime @default(now())
+
+  strikes OiStrike[]
+
+  @@index([product, extractedAt])
+  @@index([createdAt])
+  @@index([product, createdAt])
+}
+
+model OiStrike {
+  id         String     @id @default(cuid())
+  snapshotId String
+  snapshot   OiSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  strike    Float
+  putOi     Float?    // Put Open Interest
+  callOi    Float?    // Call Open Interest
+  volSettle Float?    // Implied Volatility %
+  range     String?
+
+  @@index([snapshotId, strike])
+}
+
+// ============================================
+// OI Change - การเปลี่ยนแปลง OI จากวันก่อน
+// ============================================
+model OiChangeSnapshot {
+  id          String   @id @default(cuid())
+  product     String
+  expiry      String
+  futurePrice Float?
+  
+  // Summary data
+  totalPutChange  Float?
+  totalCallChange Float?
+  vol             Float?
+  volChg          Float?
+  futureChg       Float?
+  
+  extractedAt DateTime
+  createdAt   DateTime @default(now())
+
+  strikes OiChangeStrike[]
+
+  @@index([product, extractedAt])
+  @@index([createdAt])
+  @@index([product, createdAt])
+}
+
+model OiChangeStrike {
+  id         String           @id @default(cuid())
+  snapshotId String
+  snapshot   OiChangeSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  strike     Float
+  putChange  Float?    // Put OI Change
+  callChange Float?    // Call OI Change
+  volSettle  Float?
+  range      String?
+
+  @@index([snapshotId, strike])
+}
+
+// ============================================
+// Signal - สัญญาณเทรด (วิเคราะห์จากทุก data type)
+// ============================================
+model Signal {
+  id       String @id @default(cuid())
+  product  String
+  type     String // "BUY" | "SELL" | "NEUTRAL"
+  strength Int    // 1-5
+  reason   String
+  analysis Json   // Detailed analysis data
+
+  putCallRatio  Float?
+  maxPainStrike Float?
+  currentPrice  Float?
+
+  // Link to source snapshots
+  volumeSnapshotId   String?
+  oiSnapshotId       String?
+  oiChangeSnapshotId String?
+
+  createdAt DateTime @default(now())
+  notified  Boolean  @default(false)
+
+  @@index([product, createdAt])
+  @@index([createdAt])
+}
+
+// ============================================
+// Settings - การตั้งค่าระบบ
+// ============================================
+model Settings {
+  id               String   @id @default("default")
+  telegramBotToken String?
+  telegramChatId   String?
+  signalThreshold  Int      @default(3) // Minimum strength to notify
+  analysisInterval Int      @default(5) // Minutes
+  updatedAt        DateTime @updatedAt
+}
+
+// ============================================
+// AI Prediction - บันทึกการวิเคราะห์ของ AI
+// ============================================
+model AIPrediction {
+  id          String   @id @default(cuid())
+  provider    String   // "openai" | "gemini" | "deepseek" | "consensus"
+  model       String   // "gpt-4o" | "gemini-1.5-flash" | "deepseek-chat"
+  
+  // Prediction details
+  recommendation String // "STRONG_BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG_SELL"
+  confidence     Int    // 0-100
+  
+  // Entry/Exit levels
+  entryStart     Float
+  entryEnd       Float
+  stopLoss       Float
+  takeProfit1    Float
+  takeProfit2    Float
+  takeProfit3    Float?
+  
+  // Market data at time of prediction
+  priceAtPrediction Float
+  product           String
+  
+  // Full analysis JSON
+  analysis Json
+  
+  // Outcome tracking
+  outcome         String?  // "WIN" | "LOSS" | "BREAKEVEN" | "PENDING"
+  priceAtOutcome  Float?
+  outcomeNotes    String?
+  evaluatedAt     DateTime?
+  
+  // Calculated accuracy
+  hitTp1      Boolean?
+  hitTp2      Boolean?
+  hitTp3      Boolean?
+  hitSl       Boolean?
+  maxProfit   Float?  // Max favorable excursion
+  maxLoss     Float?  // Max adverse excursion
+  
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime? // When this prediction is no longer valid
+  
+  @@index([provider, createdAt])
+  @@index([outcome, createdAt])
+  @@index([recommendation, createdAt])
+}
+
+// ============================================
+// AI Accuracy Stats - สถิติความแม่นยำ
+// ============================================
+model AIAccuracyStats {
+  id          String   @id @default(cuid())
+  provider    String   @unique // "openai" | "gemini" | "deepseek" | "consensus"
+  
+  // Overall stats
+  totalPredictions Int     @default(0)
+  correctPredictions Int   @default(0)
+  incorrectPredictions Int @default(0)
+  pendingPredictions Int   @default(0)
+  
+  // Win rate
+  winRate Float @default(0) // 0-100%
+  
+  // By recommendation type
+  buyAccuracy    Float @default(0)
+  sellAccuracy   Float @default(0)
+  neutralAccuracy Float @default(0)
+  
+  // TP hit rates
+  tp1HitRate Float @default(0)
+  tp2HitRate Float @default(0)
+  tp3HitRate Float @default(0)
+  slHitRate  Float @default(0)
+  
+  // Average metrics
+  avgConfidence Float @default(0)
+  avgMaxProfit  Float @default(0)
+  avgMaxLoss    Float @default(0)
+  
+  // Time-based
+  last30DaysWinRate Float @default(0)
+  last7DaysWinRate  Float @default(0)
+  
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Economic Calendar - ปฏิทินเศรษฐกิจ
+// ============================================
+model EconomicEvent {
+  id          String   @id @default(cuid())
+  externalId  String   @unique // e.g., "forexfactory-12345"
+  title       String
+  date        DateTime
+  time        String   // HH:MM
+  currency    String   // USD, EUR, etc.
+  impact      String   // HIGH, MEDIUM, LOW
+  forecast    String?
+  actual      String?
+  previous    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([impact])
+}
+
+// ============================================
+// MT5 Order - คำสั่งเทรด MT5 (จำลอง)
+// ============================================
+model MT5Order {
+  id           String   @id @default(cuid())
+  symbol       String   // e.g., "XAUUSD"
+  orderType    String   // "BUY" | "SELL"
+  lotSize      Float    @default(0.01)
+  
+  // Entry
+  entryPrice   Float
+  entryTime    DateTime @default(now())
+  
+  // TP/SL levels
+  stopLoss     Float
+  takeProfit1  Float
+  takeProfit2  Float?
+  takeProfit3  Float?
+  
+  // Current status
+  status       String   @default("PENDING") // PENDING, OPEN, CLOSED
+  
+  // Result tracking
+  result       String?  // TP1_HIT, TP2_HIT, TP3_HIT, SL_HIT, MANUAL_CLOSE, null
+  closePrice   Float?
+  closeTime    DateTime?
+  profitLoss   Float?   // in pips or points
+  
+  // Checklist flags
+  tp1Hit       Boolean  @default(false)
+  tp2Hit       Boolean  @default(false)
+  tp3Hit       Boolean  @default(false)
+  slHit        Boolean  @default(false)
+  
+  // Notes
+  notes        String?
+  signalSource String?  // "AI", "MANUAL", "SIGNAL"
+  
+  // Link to AI prediction if applicable
+  aiPredictionId String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([symbol, status])
+  @@index([createdAt])
+  @@index([status])
+}
